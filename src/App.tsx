@@ -8,9 +8,7 @@ import {
   auth, db 
 } from './firebase';
 import { 
-  signInWithPopup, 
-  signInWithRedirect,
-  GoogleAuthProvider, 
+  signInAnonymously,
   onAuthStateChanged, 
   signOut,
   User as FirebaseUser
@@ -274,7 +272,7 @@ function GreenRewardsApp() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        setLoading(false); // Show UI immediately once user is known
+        setLoading(false);
 
         // Fetch profile in background
         const userDoc = doc(db, 'users', firebaseUser.uid);
@@ -283,7 +281,7 @@ function GreenRewardsApp() {
         if (!userSnap.exists()) {
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
+            email: firebaseUser.email || 'guest@greenrewards.app',
             points: 0,
             totalEarned: 0,
             wishNumber: DEFAULT_WISH_NUMBER
@@ -316,15 +314,13 @@ function GreenRewardsApp() {
           setWithdrawals(list);
         }, (e) => handleFirestoreError(e, OperationType.LIST, 'withdrawals'));
       } else {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-        
-        // Auto-trigger login with minimal delay
-        const timer = setTimeout(() => {
-          handleLogin();
-        }, 500);
-        return () => clearTimeout(timer);
+        // Auto-login anonymously for direct access
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous login failed", error);
+          setLoading(false);
+        }
       }
     }, (e) => {
       console.error("Auth error", e);
@@ -334,20 +330,7 @@ function GreenRewardsApp() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      // Try popup first
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      console.error("Login failed", error);
-      // If popup is blocked, we show the button (handled by the UI state)
-      if (error.code === 'auth/popup-blocked') {
-        setMessage({ type: 'error', text: 'Popup blocked! Please click the button to login.' });
-        setTimeout(() => setMessage(null), 5000);
-      }
-    }
-  };
+  const handleLogin = () => {}; // No longer needed but kept for compatibility
 
   const handleLogout = () => signOut(auth);
 
@@ -464,51 +447,6 @@ function GreenRewardsApp() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center max-w-md w-full"
-        >
-          <div className="w-24 h-24 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-blue-100">
-            <Play className="text-white w-12 h-12 fill-current" />
-          </div>
-          <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">GreenRewards</h1>
-          <p className="text-gray-500 mb-10 text-lg">
-            Welcome back! Please sign in to continue earning.
-          </p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={handleLogin}
-              className="w-full bg-white border-2 border-gray-100 hover:border-blue-600 text-gray-700 font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg shadow-sm hover:shadow-md"
-            >
-              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-              Sign in with Google
-            </button>
-            
-            <p className="text-xs text-gray-400">
-              By signing in, you agree to our Terms of Service.
-            </p>
-          </div>
-
-          {message && message.type === 'error' && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-6 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
-            >
-              <AlertCircle size={16} />
-              {message.text}
-            </motion.div>
-          )}
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 pb-24 md:pb-0 md:pl-64">
       {/* Sidebar (Desktop) */}
@@ -549,23 +487,14 @@ function GreenRewardsApp() {
 
         <div className="mt-auto pt-6 border-t border-gray-100">
           <div className="flex items-center gap-3 mb-6 px-2">
-            <img 
-              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-              className="w-10 h-10 rounded-full border-2 border-green-100" 
-              alt="Avatar"
-            />
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-50">
+              G
+            </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName}</p>
-              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">Guest User</p>
+              <p className="text-xs text-gray-500 truncate">Anonymous Access</p>
             </div>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-3 text-gray-500 hover:text-red-600 transition-colors px-2 w-full"
-          >
-            <LogOut size={20} />
-            <span className="text-sm font-medium">Sign Out</span>
-          </button>
         </div>
       </aside>
 
