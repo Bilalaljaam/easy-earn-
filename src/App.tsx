@@ -9,6 +9,7 @@ import {
 } from './firebase';
 import { 
   signInWithPopup, 
+  signInWithRedirect,
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signOut,
@@ -314,6 +315,12 @@ function GreenRewardsApp() {
         }, (e) => handleFirestoreError(e, OperationType.LIST, 'withdrawals'));
       } else {
         setProfile(null);
+        // Auto-trigger login if not logged in
+        // We use a small delay to ensure the UI has rendered
+        const timer = setTimeout(() => {
+          handleLogin();
+        }, 1000);
+        return () => clearTimeout(timer);
       }
       setLoading(false);
     }, (e) => console.error("Auth error", e));
@@ -324,9 +331,15 @@ function GreenRewardsApp() {
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
+      // Try popup first
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      // If popup is blocked, we show the button (handled by the UI state)
+      if (error.code === 'auth/popup-blocked') {
+        setMessage({ type: 'error', text: 'Popup blocked! Please click the button to login.' });
+        setTimeout(() => setMessage(null), 5000);
+      }
     }
   };
 
@@ -449,24 +462,42 @@ function GreenRewardsApp() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-md"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md w-full"
         >
-          <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Play className="text-green-600 w-10 h-10 fill-current" />
+          <div className="w-24 h-24 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-blue-100">
+            <Play className="text-white w-12 h-12 fill-current" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4 tracking-tight">GreenRewards</h1>
-          <p className="text-gray-600 mb-8 text-lg">
-            Watch engaging videos and earn points that you can withdraw as real cash.
+          <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">GreenRewards</h1>
+          <p className="text-gray-500 mb-10 text-lg">
+            Welcome back! Please sign in to continue earning.
           </p>
-          <button
-            onClick={handleLogin}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-3 text-lg"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            Continue with Google
-          </button>
+          
+          <div className="space-y-4">
+            <button
+              onClick={handleLogin}
+              className="w-full bg-white border-2 border-gray-100 hover:border-blue-600 text-gray-700 font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg shadow-sm hover:shadow-md"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+              Sign in with Google
+            </button>
+            
+            <p className="text-xs text-gray-400">
+              By signing in, you agree to our Terms of Service.
+            </p>
+          </div>
+
+          {message && message.type === 'error' && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-6 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <AlertCircle size={16} />
+              {message.text}
+            </motion.div>
+          )}
         </motion.div>
       </div>
     );
