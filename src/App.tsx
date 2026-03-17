@@ -272,9 +272,11 @@ function GreenRewardsApp() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
-        // Fetch or create user profile
+        setUser(firebaseUser);
+        setLoading(false); // Show UI immediately once user is known
+
+        // Fetch profile in background
         const userDoc = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userDoc);
         
@@ -314,16 +316,20 @@ function GreenRewardsApp() {
           setWithdrawals(list);
         }, (e) => handleFirestoreError(e, OperationType.LIST, 'withdrawals'));
       } else {
+        setUser(null);
         setProfile(null);
-        // Auto-trigger login if not logged in
-        // We use a small delay to ensure the UI has rendered
+        setLoading(false);
+        
+        // Auto-trigger login with minimal delay
         const timer = setTimeout(() => {
           handleLogin();
-        }, 1000);
+        }, 500);
         return () => clearTimeout(timer);
       }
+    }, (e) => {
+      console.error("Auth error", e);
       setLoading(false);
-    }, (e) => console.error("Auth error", e));
+    });
 
     return () => unsubscribe();
   }, []);
