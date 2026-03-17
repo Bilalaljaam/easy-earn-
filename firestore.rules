@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - points: number (required)
+    //   - totalEarned: number (required)
+    //   - wishNumber: string (optional)
+    //
+    // Collection: videos
+    // Fields:
+    //   - title: string (required)
+    //   - thumbnail: string (required)
+    //   - duration: string (required)
+    //   - pointsReward: number (required)
+    //   - videoUrl: string (required)
+    //
+    // Collection: withdrawals
+    // Fields:
+    //   - userId: string (required)
+    //   - amount: number (required)
+    //   - points: number (required)
+    //   - status: string (required, enum: pending, completed, rejected)
+    //   - wishNumber: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "bilal.al.jaam@hotmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'points', 'totalEarned']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.points is number &&
+             data.totalEarned is number;
+    }
+
+    function isValidWithdrawal(data) {
+      return data.keys().hasAll(['userId', 'amount', 'points', 'status', 'wishNumber', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.points is number && data.points >= 0 &&
+             data.status == 'pending' &&
+             data.wishNumber is string && data.wishNumber.size() >= 8 &&
+             data.timestamp == request.time;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.points == 0;
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin();
+    }
+
+    match /videos/{videoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidWithdrawal(request.resource.data);
+      allow update: if isAdmin();
+    }
+  }
+}

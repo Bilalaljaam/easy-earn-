@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "App user with point balance and withdrawal info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "points": { "type": "number" },
+        "totalEarned": { "type": "number" },
+        "wishNumber": { "type": "string" }
+      },
+      "required": ["uid", "email", "points"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Video available for watching to earn points.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "duration": { "type": "string" },
+        "pointsReward": { "type": "number" },
+        "videoUrl": { "type": "string" }
+      },
+      "required": ["title", "pointsReward", "videoUrl"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "Cash withdrawal request via Wish Money.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "points": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
+        "wishNumber": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "points", "status", "wishNumber", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and balance."
+    },
+    "/videos/{videoId}": {
+      "schema": "Video",
+      "description": "Catalog of reward videos."
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Withdrawal history."
+    }
+  }
+}
