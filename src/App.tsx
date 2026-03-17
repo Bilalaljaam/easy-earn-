@@ -337,17 +337,12 @@ function GreenRewardsApp() {
   const startWatching = (video: Video) => {
     setWatchingVideo(video);
     setWatchProgress(0);
-    
-    // Simulate watching progress
-    const interval = setInterval(() => {
-      setWatchProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 1000);
+  };
+
+  const handleVideoProgress = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = e.currentTarget;
+    const progress = (video.currentTime / video.duration) * 100;
+    setWatchProgress(progress);
   };
 
   const completeWatch = async () => {
@@ -381,18 +376,38 @@ function GreenRewardsApp() {
   };
 
   const addPoints = async (amount: number, successMessage: string) => {
-    if (!profile || !user) return;
+    if (!user) return;
+    
     try {
       const userDoc = doc(db, 'users', user.uid);
-      await updateDoc(userDoc, {
-        points: profile.points + amount,
-        totalEarned: profile.totalEarned + amount
-      });
+      const userSnap = await getDoc(userDoc);
       
-      setMessage({ type: 'success', text: successMessage });
-      setTimeout(() => setMessage(null), 3000);
+      if (userSnap.exists()) {
+        const currentData = userSnap.data() as UserProfile;
+        await updateDoc(userDoc, {
+          points: (currentData.points || 0) + amount,
+          totalEarned: (currentData.totalEarned || 0) + amount
+        });
+        
+        setMessage({ type: 'success', text: successMessage });
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        // Fallback if profile doesn't exist yet
+        const newProfile: UserProfile = {
+          uid: user.uid,
+          email: user.email || 'guest@greenrewards.app',
+          points: amount,
+          totalEarned: amount,
+          wishNumber: DEFAULT_WISH_NUMBER
+        };
+        await setDoc(userDoc, newProfile);
+        setMessage({ type: 'success', text: successMessage });
+        setTimeout(() => setMessage(null), 3000);
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      console.error("Error adding points:", error);
+      setMessage({ type: 'error', text: "Failed to award points. Please try again." });
+      setTimeout(() => setMessage(null), 3000);
     }
   };
 
@@ -995,6 +1010,7 @@ function GreenRewardsApp() {
                   src={watchingVideo.videoUrl} 
                   className="w-full h-full object-contain"
                   autoPlay
+                  onTimeUpdate={handleVideoProgress}
                   onEnded={completeWatch}
                 />
                 
